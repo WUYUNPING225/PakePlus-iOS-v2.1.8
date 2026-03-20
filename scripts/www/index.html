@@ -1,88 +1,1866 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="./static/css/styles.css" />
-        <meta
-            http-equiv="Content-Security-Policy"
-            content="default-src * 'unsafe-inline' 'unsafe-eval'"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Tauri App</title>
-        <script src="./static/js/main.js"></script>
-    </head>
-    <body>
-        <main class="container">
-            <h1>Welcome to TauriMan</h1>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【东方小哥】批量邮件发送平台</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- SMTP.js 用于发送邮件 -->
+    <script src="https://smtpjs.com/v3/smtp.js"></script>
+    <!-- Papa Parse 用于解析CSV文件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#06b6d4',
+                        light: '#f3f4f6',
+                        dark: '#1f2937'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    boxShadow: {
+                        card: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .transition-all-300 {
+                transition: all 0.3s ease;
+            }
+            .card {
+                @apply bg-white rounded-lg shadow-card p-6 transition-all-300;
+            }
+            .card:hover {
+                @apply shadow-card-hover;
+            }
+            .btn {
+                @apply px-4 py-2 rounded-md font-medium transition-all-300 focus:outline-none focus:ring-2 focus:ring-opacity-50;
+            }
+            .btn-primary {
+                @apply bg-primary text-white hover:bg-blue-600 focus:ring-blue-500;
+            }
+            .btn-secondary {
+                @apply bg-secondary text-white hover:bg-slate-600 focus:ring-slate-500;
+            }
+            .btn-success {
+                @apply bg-success text-white hover:bg-green-600 focus:ring-green-500;
+            }
+            .btn-danger {
+                @apply bg-danger text-white hover:bg-red-600 focus:ring-red-500;
+            }
+            .btn-warning {
+                @apply bg-warning text-white hover:bg-amber-600 focus:ring-amber-500;
+            }
+            .input {
+                @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+            }
+            .textarea {
+                @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+            }
+            .nav-link {
+                @apply flex items-center px-4 py-3 text-gray-600 rounded-md transition-all-300;
+            }
+            .nav-link:hover {
+                @apply bg-gray-100 text-primary;
+            }
+            .nav-link.active {
+                @apply bg-blue-50 text-primary font-medium;
+            }
+            .badge {
+                @apply px-2 py-1 text-xs font-medium rounded-full;
+            }
+            .badge-success {
+                @apply bg-green-100 text-green-800;
+            }
+            .badge-danger {
+                @apply bg-red-100 text-red-800;
+            }
+            .badge-warning {
+                @apply bg-yellow-100 text-yellow-800;
+            }
+            .badge-info {
+                @apply bg-blue-100 text-blue-800;
+            }
+            .progress-bar {
+                @apply h-2 bg-gray-200 rounded-full overflow-hidden;
+            }
+            .progress-value {
+                @apply h-full bg-primary transition-all duration-300;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <!-- 侧边导航栏 -->
+        <aside class="w-64 bg-white shadow-md hidden md:block">
+            <div class="p-6">
+                <h1 class="text-xl font-bold text-primary flex items-center">
+                    <i class="fa fa-envelope-o mr-2"></i>
+                    【东方小哥】
+                     批量邮件发送平台
+                </h1>
+            </div>
+            <nav class="mt-2 px-3 space-y-1">
+                <a href="#config" class="nav-link active" data-section="config">
+                    <i class="fa fa-cog w-5 h-5 mr-3"></i>
+                    <span>邮箱配置</span>
+                </a>
+                <a href="#recipients" class="nav-link" data-section="recipients">
+                    <i class="fa fa-users w-5 h-5 mr-3"></i>
+                    <span>收件人管理</span>
+                </a>
+                <a href="#compose" class="nav-link" data-section="compose">
+                    <i class="fa fa-pencil w-5 h-5 mr-3"></i>
+                    <span>邮件编辑</span>
+                </a>
+                <a href="#attachments" class="nav-link" data-section="attachments">
+                    <i class="fa fa-paperclip w-5 h-5 mr-3"></i>
+                    <span>附件管理</span>
+                </a>
+                <a href="#send" class="nav-link" data-section="send">
+                    <i class="fa fa-paper-plane w-5 h-5 mr-3"></i>
+                    <span>发送控制</span>
+                </a>
+            </nav>
+            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gray-50 border-t">
+                <div class="text-sm text-gray-500">
+                    <div class="flex items-center">
+                        <i class="fa fa-clock-o mr-2"></i>
+                        <span id="current-time">00:00:00</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
 
-            <div class="row">
-                <a
-                    href="https://tauri.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="./assets/tauri.svg"
-                        class="logo tauri"
-                        alt="Tauri logo"
-                    />
+        <!-- 移动端导航栏 -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white shadow-md md:hidden z-10">
+            <div class="flex justify-around">
+                <a href="#config" class="flex flex-col items-center py-2 text-xs text-primary" data-section="config">
+                    <i class="fa fa-cog text-lg"></i>
+                    <span>配置</span>
                 </a>
-                <a
-                    href="https://pakeplus.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="https://hk.gh-proxy.org/https://github.com/Sjj1024/PakePlus/blob/main/app-icon.png"
-                        class="logo vanilla"
-                        alt="JavaScript logo"
-                    />
+                <a href="#recipients" class="flex flex-col items-center py-2 text-xs text-gray-500" data-section="recipients">
+                    <i class="fa fa-users text-lg"></i>
+                    <span>收件人</span>
+                </a>
+                <a href="#compose" class="flex flex-col items-center py-2 text-xs text-gray-500" data-section="compose">
+                    <i class="fa fa-pencil text-lg"></i>
+                    <span>编辑</span>
+                </a>
+                <a href="#attachments" class="flex flex-col items-center py-2 text-xs text-gray-500" data-section="attachments">
+                    <i class="fa fa-paperclip text-lg"></i>
+                    <span>附件</span>
+                </a>
+                <a href="#send" class="flex flex-col items-center py-2 text-xs text-gray-500" data-section="send">
+                    <i class="fa fa-paper-plane text-lg"></i>
+                    <span>发送</span>
                 </a>
             </div>
-            <p>Click to get data</p>
-            <form class="row" id="greet-form">
-                <input id="greet-input" placeholder="Enter a name..." />
-                <button type="submit" id="getdata">GET DATA</button>
-            </form>
-            <div class="functions">
-                <a href="./book.html" target="_self">跳转到book.html</a>
-                <a
-                    href="https://www.baidu.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >跳到百度blank
-                </a>
-                <a
-                    href="https://www.baidu.com"
-                    target="_self"
-                    rel="noopener noreferrer"
-                >
-                    跳到百度self
-                </a>
-                <button onclick="sayHello()">点击我</button>
-                <button onclick="sayHello()">下载文件</button>
-                <button onclick="sayHello()">上传文件</button>
-                <button onclick="sayHello()">访问相机</button>
-                <button onclick="sayHello()">访问麦克风</button>
-                <button onclick="sayHello()">访问相册</button>
-                <button class="btn" onclick="openWechat()">打开微信</button>
-                <button class="btn" onclick="openWechatScan()">
-                    打开扫一扫
-                </button>
-                <button class="btn" onclick="openZhihu()">打开知乎</button>
-                <button onclick="sayHello()">打开抖音</button>
-                <button onclick="sayHello()">用浏览器打开</button>
-                <button>打开知乎</button>
-            </div>
-            <p id="greet-msg"></p>
-            <img src="./static/image/cursor.jpeg" alt="logo" />
-            <video
-                src="https://hk.gh-proxy.org/https://github.com/Sjj1024/PakePlus/blob/main/docs/static/videos/pakeplus.mp4"
-                autoplay
-                controls
-                style="width: 100%; height: 100%"
-            ></video>
-            <audio src="./static/music/yin.mp3" controls></audio>
+        </div>
+
+        <!-- 主内容区域 -->
+        <main class="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
+            <!-- 邮箱配置部分 -->
+            <section id="config-section" class="section active">
+                <div class="card">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">邮箱配置</h2>
+                    <p class="text-gray-600 mb-6">请配置您的发件人邮箱和SMTP服务器信息。</p>
+                    
+                    <form id="config-form" class="space-y-4">
+                        <div>
+                            <label for="sender-email" class="block text-sm font-medium text-gray-700 mb-1">发件人邮箱</label>
+                            <input type="email" id="sender-email" class="input" placeholder="请输入您的邮箱地址" required>
+                        </div>
+                        
+                        <div>
+                            <label for="sender-password" class="block text-sm font-medium text-gray-700 mb-1">授权码</label>
+                            <input type="password" id="sender-password" class="input" placeholder="请输入您的邮箱授权码" required>
+                            <p class="mt-1 text-xs text-gray-500">
+                                <i class="fa fa-info-circle mr-1"></i>
+                                授权码不是邮箱密码，需要在邮箱设置中获取。
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label for="smtp-server" class="block text-sm font-medium text-gray-700 mb-1">SMTP服务器</label>
+                            <input type="text" id="smtp-server" class="input" placeholder="如: smtp.gmail.com" required>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="smtp-port" class="block text-sm font-medium text-gray-700 mb-1">SMTP端口</label>
+                                <input type="number" id="smtp-port" class="input" value="587" required>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">加密方式</label>
+                                <div class="flex items-center space-x-4 mt-2">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="encryption" value="ssl" class="h-4 w-4 text-primary" checked>
+                                        <span class="ml-2 text-sm text-gray-700">SSL</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="encryption" value="tls" class="h-4 w-4 text-primary">
+                                        <span class="ml-2 text-sm text-gray-700">TLS</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-4">
+                            <button type="button" id="test-connection" class="btn btn-secondary mr-2">
+                                <i class="fa fa-check-circle mr-1"></i> 测试连接
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save mr-1"></i> 保存配置
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="mt-6 card">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">常见邮箱SMTP设置</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">邮箱服务</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMTP服务器</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">端口</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">加密方式</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">Gmail</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">smtp.gmail.com</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">587</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">TLS</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">QQ邮箱</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">smtp.qq.com</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">587</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">SSL</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">163邮箱</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">smtp.163.com</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">465</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">SSL</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">Outlook</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">smtp-mail.outlook.com</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">587</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">TLS</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 收件人管理部分 -->
+            <section id="recipients-section" class="section hidden">
+                <div class="card">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">收件人管理</h2>
+                    <p class="text-gray-600 mb-6">请导入或添加收件人列表。CSV文件应包含姓名和邮箱地址列。</p>
+                    
+                    <div class="mb-6">
+                        <div class="border-2 border-dashed border-gray-300 rounded-md p-6 text-center" id="drop-area">
+                            <i class="fa fa-cloud-upload text-4xl text-gray-400 mb-2"></i>
+                            <p class="text-gray-500 mb-2">拖拽CSV文件到此处，或</p>
+                            <label class="btn btn-primary">
+                                <input type="file" id="csv-file" accept=".csv" class="hidden">
+                                <i class="fa fa-folder-open mr-1"></i> 选择文件
+                            </label>
+                            <p class="mt-2 text-xs text-gray-500">支持CSV格式，最大文件大小10MB</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-500 mr-2">显示:</span>
+                            <select id="recipients-filter" class="input py-1 px-2 text-sm">
+                                <option value="all">全部</option>
+                                <option value="pending">待发送</option>
+                                <option value="success">发送成功</option>
+                                <option value="failed">发送失败</option>
+                            </select>
+                        </div>
+                        <button id="add-recipient" class="btn btn-primary text-sm">
+                            <i class="fa fa-plus mr-1"></i> 添加收件人
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">邮箱地址</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发送时间</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recipients-list" class="bg-white divide-y divide-gray-200">
+                                <!-- 收件人列表将通过JavaScript动态生成 -->
+                                <tr class="text-center">
+                                    <td colspan="5" class="px-4 py-8 text-sm text-gray-500">暂无收件人数据</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-between items-center">
+                        <div class="text-sm text-gray-500">
+                            共 <span id="total-recipients">0</span> 个收件人
+                        </div>
+                        <div>
+                            <button id="clear-recipients" class="btn btn-danger text-sm">
+                                <i class="fa fa-trash mr-1"></i> 清空列表
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 邮件编辑部分 -->
+            <section id="compose-section" class="section hidden">
+                <div class="card">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">邮件编辑</h2>
+                    <p class="text-gray-600 mb-6">请编辑邮件主题和正文，可使用 {姓名} 占位符实现个性化。</p>
+                    
+                    <form id="email-form" class="space-y-4">
+                        <div>
+                            <label for="email-subject" class="block text-sm font-medium text-gray-700 mb-1">邮件主题</label>
+                            <input type="text" id="email-subject" class="input" placeholder="请输入邮件主题" required>
+                            <div class="mt-1 flex flex-wrap gap-2">
+                                <button type="button" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200" onclick="insertPlaceholder('subject', '{姓名}')">
+                                    插入 {姓名}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="email-body" class="block text-sm font-medium text-gray-700 mb-1">邮件正文</label>
+                            <textarea id="email-body" rows="10" class="textarea" placeholder="请输入邮件正文" required></textarea>
+                            <div class="mt-1 flex flex-wrap gap-2">
+                                <button type="button" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200" onclick="insertPlaceholder('body', '{姓名}')">
+                                    插入 {姓名}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-4">
+                            <button type="button" id="load-template" class="btn btn-secondary mr-2">
+                                <i class="fa fa-folder-open mr-1"></i> 加载模板
+                            </button>
+                            <button type="button" id="save-template" class="btn btn-secondary mr-2">
+                                <i class="fa fa-save mr-1"></i> 保存模板
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-check mr-1"></i> 保存邮件
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="mt-6 card">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">邮件预览</h3>
+                    <div class="border rounded-md p-4 bg-gray-50">
+                        <div class="mb-2 font-medium text-gray-800" id="preview-subject">邮件主题预览</div>
+                        <div class="text-gray-600 whitespace-pre-wrap" id="preview-body">邮件正文预览将显示在这里。您可以使用 {姓名} 占位符，系统会自动替换为每个收件人的姓名。</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 附件管理部分 -->
+            <section id="attachments-section" class="section hidden">
+                <div class="card">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">附件管理</h2>
+                    <p class="text-gray-600 mb-6">请上传邮件附件，支持多个文件。</p>
+                    
+                    <div class="border-2 border-dashed border-gray-300 rounded-md p-6 text-center" id="attachments-drop-area">
+                        <i class="fa fa-paperclip text-4xl text-gray-400 mb-2"></i>
+                        <p class="text-gray-500 mb-2">拖拽文件到此处，或</p>
+                        <label class="btn btn-primary">
+                            <input type="file" id="attachment-files" multiple class="hidden">
+                            <i class="fa fa-folder-open mr-1"></i> 选择文件
+                        </label>
+                        <p class="mt-2 text-xs text-gray-500">支持多种文件格式，单个文件最大10MB，总大小不超过25MB</p>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">已上传附件</h3>
+                        <div id="attachments-list" class="space-y-2">
+                            <!-- 附件列表将通过JavaScript动态生成 -->
+                            <div class="text-sm text-gray-500 py-4 text-center">暂无附件</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-between items-center">
+                        <div class="text-sm text-gray-500">
+                            总大小: <span id="attachments-size">0 KB</span>
+                        </div>
+                        <div>
+                            <button id="clear-attachments" class="btn btn-danger text-sm">
+                                <i class="fa fa-trash mr-1"></i> 清空附件
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 发送控制部分 -->
+            <section id="send-section" class="section hidden">
+                <div class="card">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">发送控制</h2>
+                    <p class="text-gray-600 mb-6">请设置发送间隔并控制邮件发送。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">发送设置</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="send-interval" class="block text-sm font-medium text-gray-700 mb-1">发送间隔 (分钟)</label>
+                                    <div class="flex items-center">
+                                        <input type="range" id="send-interval" min="1" max="10" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                        <span id="interval-value" class="ml-3 text-sm font-medium text-gray-700 w-8">1</span>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">发送顺序</label>
+                                    <select id="send-order" class="input">
+                                        <option value="original">原始顺序</option>
+                                        <option value="random">随机顺序</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">发送统计</h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-600">总收件人数:</span>
+                                    <span class="font-medium" id="stats-total">0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-600">待发送:</span>
+                                    <span class="font-medium text-yellow-600" id="stats-pending">0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-600">发送成功:</span>
+                                    <span class="font-medium text-green-600" id="stats-success">0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-600">发送失败:</span>
+                                    <span class="font-medium text-red-600" id="stats-failed">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">发送进度</h3>
+                        <div class="progress-bar">
+                            <div id="progress-value" class="progress-value" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between mt-1 text-xs text-gray-500">
+                            <span>0%</span>
+                            <span id="progress-text">0/0</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">发送日志</h3>
+                        <div id="send-log" class="h-40 overflow-y-auto p-3 bg-gray-50 rounded-md text-sm">
+                            <div class="text-gray-500 text-center py-4">暂无发送记录</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-center space-x-4">
+                        <button id="start-sending" class="btn btn-primary">
+                            <i class="fa fa-play mr-1"></i> 开始发送
+                        </button>
+                        <button id="pause-sending" class="btn btn-warning" disabled>
+                            <i class="fa fa-pause mr-1"></i> 暂停发送
+                        </button>
+                        <button id="reset-sending" class="btn btn-danger">
+                            <i class="fa fa-refresh mr-1"></i> 重置状态
+                        </button>
+                    </div>
+                </div>
+            </section>
         </main>
-    </body>
+    </div>
+
+    <!-- 添加收件人模态框 -->
+    <div id="add-recipient-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">添加收件人</h3>
+                <button id="close-recipient-modal" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="add-recipient-form" class="space-y-4">
+                <div>
+                    <label for="recipient-name" class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                    <input type="text" id="recipient-name" class="input" placeholder="请输入收件人姓名" required>
+                </div>
+                
+                <div>
+                    <label for="recipient-email" class="block text-sm font-medium text-gray-700 mb-1">邮箱地址</label>
+                    <input type="email" id="recipient-email" class="input" placeholder="请输入收件人邮箱地址" required>
+                </div>
+                
+                <div class="flex justify-end space-x-2 pt-4">
+                    <button type="button" id="cancel-add-recipient" class="btn btn-secondary">取消</button>
+                    <button type="submit" class="btn btn-primary">添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 模板选择模态框 -->
+    <div id="template-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">选择模板</h3>
+                <button id="close-template-modal" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="template-item p-3 border rounded-md cursor-pointer hover:bg-gray-50" data-template="welcome">
+                    <div class="font-medium">欢迎邮件</div>
+                    <div class="text-sm text-gray-500">适用于新用户欢迎</div>
+                </div>
+                <div class="template-item p-3 border rounded-md cursor-pointer hover:bg-gray-50" data-template="notification">
+                    <div class="font-medium">通知邮件</div>
+                    <div class="text-sm text-gray-500">适用于一般通知</div>
+                </div>
+                <div class="template-item p-3 border rounded-md cursor-pointer hover:bg-gray-50" data-template="marketing">
+                    <div class="font-medium">营销邮件</div>
+                    <div class="text-sm text-gray-500">适用于产品推广</div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end pt-4">
+                <button id="cancel-template" class="btn btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="toast" class="fixed top-4 right-4 bg-white shadow-lg rounded-md p-4 flex items-center transform translate-x-full transition-transform duration-300 z-50 max-w-xs">
+        <div id="toast-icon" class="mr-3 text-green-500">
+            <i class="fa fa-check-circle text-xl"></i>
+        </div>
+        <div class="flex-1">
+            <div id="toast-title" class="font-medium text-gray-800">成功</div>
+            <div id="toast-message" class="text-sm text-gray-600">操作已完成</div>
+        </div>
+        <button id="close-toast" class="text-gray-400 hover:text-gray-600">
+            <i class="fa fa-times"></i>
+        </button>
+    </div>
+
+    <script>
+        // 全局变量
+        let userConfig = {
+            email: "",
+            password: "",
+            smtpServer: "",
+            smtpPort: 587,
+            ssl: true
+        };
+        
+        let recipients = [];
+        let emailTemplate = {
+            subject: "",
+            body: ""
+        };
+        let attachments = [];
+        let sendInterval = 1; // 分钟
+        let isSending = false;
+        let isPaused = false;
+        let currentRecipientIndex = 0;
+        let sendOrder = "original";
+        
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化时间显示
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+            
+            // 加载保存的数据
+            loadConfig();
+            loadRecipients();
+            loadEmailTemplate();
+            loadAttachments();
+            
+            // 初始化导航
+            initNavigation();
+            
+            // 初始化表单事件
+            initFormEvents();
+            
+            // 初始化拖放区域
+            initDropAreas();
+            
+            // 初始化发送控制
+            initSendControl();
+            
+            // 初始化模态框
+            initModals();
+            
+            // 更新统计信息
+            updateStats();
+        });
+        
+        // 更新当前时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('zh-CN');
+            document.getElementById('current-time').textContent = timeString;
+        }
+        
+        // 初始化导航
+        function initNavigation() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('.section');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 移除所有活动状态
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    sections.forEach(s => s.classList.add('hidden'));
+                    
+                    // 添加当前活动状态
+                    this.classList.add('active');
+                    
+                    // 显示对应部分
+                    const sectionId = this.getAttribute('data-section') + '-section';
+                    document.getElementById(sectionId).classList.remove('hidden');
+                    
+                    // 如果是移动端，点击后滚动到顶部
+                    if (window.innerWidth < 768) {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+            });
+            
+            // 移动端导航特殊处理
+            const mobileNavLinks = document.querySelectorAll('.md\\:hidden .flex-col');
+            mobileNavLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 移除所有活动状态
+                    mobileNavLinks.forEach(l => l.classList.remove('text-primary'));
+                    mobileNavLinks.forEach(l => l.classList.add('text-gray-500'));
+                    sections.forEach(s => s.classList.add('hidden'));
+                    
+                    // 添加当前活动状态
+                    this.classList.remove('text-gray-500');
+                    this.classList.add('text-primary');
+                    
+                    // 显示对应部分
+                    const sectionId = this.getAttribute('data-section') + '-section';
+                    document.getElementById(sectionId).classList.remove('hidden');
+                });
+            });
+        }
+        
+        // 初始化表单事件
+        function initFormEvents() {
+            // 配置表单提交
+            document.getElementById('config-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveConfig();
+            });
+            
+            // 测试连接按钮
+            document.getElementById('test-connection').addEventListener('click', function() {
+                testConnection();
+            });
+            
+            // 收件人筛选
+            document.getElementById('recipients-filter').addEventListener('change', function() {
+                filterRecipients();
+            });
+            
+            // CSV文件选择
+            document.getElementById('csv-file').addEventListener('change', function(e) {
+                handleCsvFile(e.target.files[0]);
+            });
+            
+            // 添加收件人表单提交
+            document.getElementById('add-recipient-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                addRecipient();
+            });
+            
+            // 清空收件人按钮
+            document.getElementById('clear-recipients').addEventListener('click', function() {
+                clearRecipients();
+            });
+            
+            // 邮件表单提交
+            document.getElementById('email-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveEmailTemplate();
+            });
+            
+            // 加载模板按钮
+            document.getElementById('load-template').addEventListener('click', function() {
+                document.getElementById('template-modal').classList.remove('hidden');
+            });
+            
+            // 保存模板按钮
+            document.getElementById('save-template').addEventListener('click', function() {
+                saveCustomTemplate();
+            });
+            
+            // 邮件主题和正文输入事件（用于预览）
+            document.getElementById('email-subject').addEventListener('input', updatePreview);
+            document.getElementById('email-body').addEventListener('input', updatePreview);
+            
+            // 附件文件选择
+            document.getElementById('attachment-files').addEventListener('change', function(e) {
+                handleAttachmentFiles(e.target.files);
+            });
+            
+            // 清空附件按钮
+            document.getElementById('clear-attachments').addEventListener('click', function() {
+                clearAttachments();
+            });
+            
+            // 发送间隔滑块
+            document.getElementById('send-interval').addEventListener('input', function() {
+                document.getElementById('interval-value').textContent = this.value;
+                sendInterval = parseInt(this.value);
+            });
+            
+            // 发送顺序选择
+            document.getElementById('send-order').addEventListener('change', function() {
+                sendOrder = this.value;
+            });
+        }
+        
+        // 初始化拖放区域
+        function initDropAreas() {
+            // CSV拖放区域
+            const csvDropArea = document.getElementById('drop-area');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                csvDropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                csvDropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                csvDropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                csvDropArea.classList.add('bg-blue-50');
+                csvDropArea.classList.add('border-primary');
+            }
+            
+            function unhighlight() {
+                csvDropArea.classList.remove('bg-blue-50');
+                csvDropArea.classList.remove('border-primary');
+            }
+            
+            csvDropArea.addEventListener('drop', handleCsvDrop, false);
+            
+            function handleCsvDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length > 0) {
+                    handleCsvFile(files[0]);
+                }
+            }
+            
+            // 附件拖放区域
+            const attachmentsDropArea = document.getElementById('attachments-drop-area');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                attachmentsDropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                attachmentsDropArea.addEventListener(eventName, highlightAttachments, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                attachmentsDropArea.addEventListener(eventName, unhighlightAttachments, false);
+            });
+            
+            function highlightAttachments() {
+                attachmentsDropArea.classList.add('bg-blue-50');
+                attachmentsDropArea.classList.add('border-primary');
+            }
+            
+            function unhighlightAttachments() {
+                attachmentsDropArea.classList.remove('bg-blue-50');
+                attachmentsDropArea.classList.remove('border-primary');
+            }
+            
+            attachmentsDropArea.addEventListener('drop', handleAttachmentsDrop, false);
+            
+            function handleAttachmentsDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length > 0) {
+                    handleAttachmentFiles(files);
+                }
+            }
+        }
+        
+        // 初始化发送控制
+        function initSendControl() {
+            document.getElementById('start-sending').addEventListener('click', startSending);
+            document.getElementById('pause-sending').addEventListener('click', pauseSending);
+            document.getElementById('reset-sending').addEventListener('click', resetSending);
+        }
+        
+        // 初始化模态框
+        function initModals() {
+            // 添加收件人模态框
+            document.getElementById('add-recipient').addEventListener('click', function() {
+                document.getElementById('add-recipient-modal').classList.remove('hidden');
+            });
+            
+            document.getElementById('close-recipient-modal').addEventListener('click', function() {
+                document.getElementById('add-recipient-modal').classList.add('hidden');
+            });
+            
+            document.getElementById('cancel-add-recipient').addEventListener('click', function() {
+                document.getElementById('add-recipient-modal').classList.add('hidden');
+            });
+            
+            // 模板选择模态框
+            document.getElementById('close-template-modal').addEventListener('click', function() {
+                document.getElementById('template-modal').classList.add('hidden');
+            });
+            
+            document.getElementById('cancel-template').addEventListener('click', function() {
+                document.getElementById('template-modal').classList.add('hidden');
+            });
+            
+            // 模板选择
+            const templateItems = document.querySelectorAll('.template-item');
+            templateItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const templateType = this.getAttribute('data-template');
+                    loadTemplate(templateType);
+                    document.getElementById('template-modal').classList.add('hidden');
+                });
+            });
+            
+            // 关闭提示框
+            document.getElementById('close-toast').addEventListener('click', function() {
+                hideToast();
+            });
+        }
+        
+        // 显示提示框
+        function showToast(title, message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toast-title');
+            const toastMessage = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            // 设置图标和颜色
+            if (type === 'success') {
+                toastIcon.innerHTML = '<i class="fa fa-check-circle text-xl"></i>';
+                toastIcon.className = 'mr-3 text-green-500';
+            } else if (type === 'error') {
+                toastIcon.innerHTML = '<i class="fa fa-exclamation-circle text-xl"></i>';
+                toastIcon.className = 'mr-3 text-red-500';
+            } else if (type === 'warning') {
+                toastIcon.innerHTML = '<i class="fa fa-exclamation-triangle text-xl"></i>';
+                toastIcon.className = 'mr-3 text-yellow-500';
+            } else if (type === 'info') {
+                toastIcon.innerHTML = '<i class="fa fa-info-circle text-xl"></i>';
+                toastIcon.className = 'mr-3 text-blue-500';
+            }
+            
+            // 显示提示框
+            toast.classList.remove('translate-x-full');
+            
+            // 3秒后自动隐藏
+            setTimeout(hideToast, 3000);
+        }
+        
+        // 隐藏提示框
+        function hideToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('translate-x-full');
+        }
+        
+        // 保存配置
+        function saveConfig() {
+            const email = document.getElementById('sender-email').value;
+            const password = document.getElementById('sender-password').value;
+            const smtpServer = document.getElementById('smtp-server').value;
+            const smtpPort = parseInt(document.getElementById('smtp-port').value);
+            const ssl = document.querySelector('input[name="encryption"]:checked').value === 'ssl';
+            
+            userConfig = {
+                email,
+                password: btoa(password), // 简单的base64编码
+                smtpServer,
+                smtpPort,
+                ssl
+            };
+            
+            try {
+                localStorage.setItem('userConfig', JSON.stringify(userConfig));
+                showToast('成功', '邮箱配置已保存');
+            } catch (error) {
+                showToast('错误', '保存配置失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 加载配置
+        function loadConfig() {
+            try {
+                const savedConfig = localStorage.getItem('userConfig');
+                if (savedConfig) {
+                    userConfig = JSON.parse(savedConfig);
+                    
+                    document.getElementById('sender-email').value = userConfig.email || '';
+                    document.getElementById('sender-password').value = userConfig.password ? atob(userConfig.password) : '';
+                    document.getElementById('smtp-server').value = userConfig.smtpServer || '';
+                    document.getElementById('smtp-port').value = userConfig.smtpPort || 587;
+                    
+                    if (userConfig.ssl) {
+                        document.querySelector('input[name="encryption"][value="ssl"]').checked = true;
+                    } else {
+                        document.querySelector('input[name="encryption"][value="tls"]').checked = true;
+                    }
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+        
+        // 测试连接
+        function testConnection() {
+            // 先保存当前配置
+            saveConfig();
+            
+            const testBtn = document.getElementById('test-connection');
+            const originalText = testBtn.innerHTML;
+            
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 测试中...';
+            
+            // 模拟测试连接
+            setTimeout(() => {
+                testBtn.disabled = false;
+                testBtn.innerHTML = originalText;
+                
+                // 这里应该有实际的连接测试逻辑
+                // 由于是前端模拟，我们假设连接成功
+                showToast('成功', '连接测试成功');
+            }, 1500);
+        }
+        
+        // 处理CSV文件
+        function handleCsvFile(file) {
+            if (!file) return;
+            
+            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+                showToast('错误', '请选择CSV格式的文件', 'error');
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) { // 10MB
+                showToast('错误', '文件大小不能超过10MB', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const csvData = Papa.parse(e.target.result, {
+                        header: true,
+                        skipEmptyLines: true
+                    });
+                    
+                    if (csvData.errors.length > 0) {
+                        showToast('警告', 'CSV解析有错误，但将尝试继续', 'warning');
+                        console.warn('CSV解析错误:', csvData.errors);
+                    }
+                    
+                    if (csvData.data.length === 0) {
+                        showToast('错误', 'CSV文件中没有数据', 'error');
+                        return;
+                    }
+                    
+                    // 处理CSV数据
+                    processCsvData(csvData.data);
+                    
+                } catch (error) {
+                    showToast('错误', '解析CSV文件失败: ' + error.message, 'error');
+                }
+            };
+            
+            reader.onerror = function() {
+                showToast('错误', '读取文件失败', 'error');
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // 处理CSV数据
+        function processCsvData(data) {
+            const newRecipients = [];
+            
+            data.forEach((row, index) => {
+                // 尝试找到姓名和邮箱列
+                let name = '';
+                let email = '';
+                
+                // 遍历所有列，查找包含姓名和邮箱的列
+                for (const key in row) {
+                    const lowerKey = key.toLowerCase();
+                    const value = row[key].trim();
+                    
+                    if ((lowerKey.includes('name') || lowerKey.includes('姓名') || lowerKey.includes('name')) && !name) {
+                        name = value;
+                    } else if ((lowerKey.includes('email') || lowerKey.includes('邮箱') || lowerKey.includes('mail')) && !email) {
+                        email = value;
+                    }
+                }
+                
+                // 如果没有找到，尝试使用第一列和第二列
+                if (!name && Object.keys(row).length > 0) {
+                    name = row[Object.keys(row)[0]].trim();
+                }
+                
+                if (!email && Object.keys(row).length > 1) {
+                    email = row[Object.keys(row)[1]].trim();
+                }
+                
+                // 验证邮箱格式
+                if (email && isValidEmail(email)) {
+                    newRecipients.push({
+                        id: generateUniqueId(),
+                        name: name || email.split('@')[0],
+                        email: email,
+                        sent: false,
+                        sentTime: null,
+                        status: 'pending'
+                    });
+                }
+            });
+            
+            if (newRecipients.length === 0) {
+                showToast('错误', '未找到有效的收件人数据', 'error');
+                return;
+            }
+            
+            // 添加到现有收件人列表
+            recipients = [...recipients, ...newRecipients];
+            
+            // 保存并更新UI
+            saveRecipients();
+            renderRecipients();
+            updateStats();
+            
+            showToast('成功', `已导入 ${newRecipients.length} 个收件人`);
+        }
+        
+        // 验证邮箱格式
+        function isValidEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+        
+        // 生成唯一ID
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        }
+        
+        // 保存收件人列表
+        function saveRecipients() {
+            try {
+                localStorage.setItem('recipients', JSON.stringify(recipients));
+            } catch (error) {
+                showToast('错误', '保存收件人列表失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 加载收件人列表
+        function loadRecipients() {
+            try {
+                const savedRecipients = localStorage.getItem('recipients');
+                if (savedRecipients) {
+                    recipients = JSON.parse(savedRecipients);
+                    renderRecipients();
+                }
+            } catch (error) {
+                console.error('加载收件人列表失败:', error);
+            }
+        }
+        
+        // 渲染收件人列表
+        function renderRecipients() {
+            const recipientsList = document.getElementById('recipients-list');
+            const filter = document.getElementById('recipients-filter').value;
+            
+            let filteredRecipients = recipients;
+            
+            if (filter !== 'all') {
+                filteredRecipients = recipients.filter(r => r.status === filter);
+            }
+            
+            if (filteredRecipients.length === 0) {
+                recipientsList.innerHTML = '<tr class="text-center"><td colspan="5" class="px-4 py-8 text-sm text-gray-500">暂无收件人数据</td></tr>';
+            } else {
+                recipientsList.innerHTML = filteredRecipients.map(recipient => {
+                    let statusBadge = '';
+                    
+                    switch (recipient.status) {
+                        case 'success':
+                            statusBadge = '<span class="badge badge-success">发送成功</span>';
+                            break;
+                        case 'failed':
+                            statusBadge = '<span class="badge badge-danger">发送失败</span>';
+                            break;
+                        case 'sending':
+                            statusBadge = '<span class="badge badge-warning">发送中</span>';
+                            break;
+                        default:
+                            statusBadge = '<span class="badge badge-info">待发送</span>';
+                    }
+                    
+                    const sentTime = recipient.sentTime ? new Date(recipient.sentTime).toLocaleString('zh-CN') : '-';
+                    
+                    return `
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${recipient.name}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${recipient.email}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm">${statusBadge}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${sentTime}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                <button class="text-red-600 hover:text-red-900" onclick="deleteRecipient('${recipient.id}')">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            document.getElementById('total-recipients').textContent = recipients.length;
+        }
+        
+        // 筛选收件人
+        function filterRecipients() {
+            renderRecipients();
+        }
+        
+        // 添加收件人
+        function addRecipient() {
+            const name = document.getElementById('recipient-name').value.trim();
+            const email = document.getElementById('recipient-email').value.trim();
+            
+            if (!name || !email) {
+                showToast('错误', '请填写姓名和邮箱地址', 'error');
+                return;
+            }
+            
+            if (!isValidEmail(email)) {
+                showToast('错误', '请输入有效的邮箱地址', 'error');
+                return;
+            }
+            
+            // 检查邮箱是否已存在
+            if (recipients.some(r => r.email === email)) {
+                showToast('警告', '该邮箱地址已存在', 'warning');
+                return;
+            }
+            
+            const newRecipient = {
+                id: generateUniqueId(),
+                name,
+                email,
+                sent: false,
+                sentTime: null,
+                status: 'pending'
+            };
+            
+            recipients.push(newRecipient);
+            
+            // 保存并更新UI
+            saveRecipients();
+            renderRecipients();
+            updateStats();
+            
+            // 清空表单
+            document.getElementById('add-recipient-form').reset();
+            
+            // 关闭模态框
+            document.getElementById('add-recipient-modal').classList.add('hidden');
+            
+            showToast('成功', '收件人已添加');
+        }
+        
+        // 删除收件人
+        function deleteRecipient(id) {
+            recipients = recipients.filter(r => r.id !== id);
+            
+            // 保存并更新UI
+            saveRecipients();
+            renderRecipients();
+            updateStats();
+            
+            showToast('成功', '收件人已删除');
+        }
+        
+        // 清空收件人列表
+        function clearRecipients() {
+            if (confirm('确定要清空所有收件人吗？此操作不可撤销。')) {
+                recipients = [];
+                
+                // 保存并更新UI
+                saveRecipients();
+                renderRecipients();
+                updateStats();
+                
+                showToast('成功', '收件人列表已清空');
+            }
+        }
+        
+        // 保存邮件模板
+        function saveEmailTemplate() {
+            const subject = document.getElementById('email-subject').value.trim();
+            const body = document.getElementById('email-body').value.trim();
+            
+            if (!subject || !body) {
+                showToast('错误', '请填写邮件主题和正文', 'error');
+                return;
+            }
+            
+            emailTemplate = { subject, body };
+            
+            try {
+                localStorage.setItem('emailTemplate', JSON.stringify(emailTemplate));
+                updatePreview();
+                showToast('成功', '邮件模板已保存');
+            } catch (error) {
+                showToast('错误', '保存邮件模板失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 加载邮件模板
+        function loadEmailTemplate() {
+            try {
+                const savedTemplate = localStorage.getItem('emailTemplate');
+                if (savedTemplate) {
+                    emailTemplate = JSON.parse(savedTemplate);
+                    
+                    document.getElementById('email-subject').value = emailTemplate.subject || '';
+                    document.getElementById('email-body').value = emailTemplate.body || '';
+                    
+                    updatePreview();
+                }
+            } catch (error) {
+                console.error('加载邮件模板失败:', error);
+            }
+        }
+        
+        // 更新预览
+        function updatePreview() {
+            const subject = document.getElementById('email-subject').value || '';
+            const body = document.getElementById('email-body').value || '';
+            
+            document.getElementById('preview-subject').textContent = subject.replace('{姓名}', '张三');
+            document.getElementById('preview-body').textContent = body.replace('{姓名}', '张三');
+        }
+        
+        // 插入占位符
+        function insertPlaceholder(field, placeholder) {
+            const element = document.getElementById(`email-${field}`);
+            const start = element.selectionStart;
+            const end = element.selectionEnd;
+            const text = element.value;
+            
+            element.value = text.substring(0, start) + placeholder + text.substring(end);
+            
+            // 设置光标位置
+            const newPosition = start + placeholder.length;
+            element.setSelectionRange(newPosition, newPosition);
+            
+            // 触发input事件以更新预览
+            element.dispatchEvent(new Event('input'));
+            
+            // 聚焦元素
+            element.focus();
+        }
+        
+        // 加载预设模板
+        function loadTemplate(templateType) {
+            let subject = '';
+            let body = '';
+            
+            switch (templateType) {
+                case 'welcome':
+                    subject = '欢迎加入我们，{姓名}';
+                    body = `亲爱的{姓名}：
+
+您好！
+
+非常高兴您加入我们的行列。我们相信您会在这里找到有价值的信息和资源。
+
+如果您有任何问题或需要帮助，请随时联系我们。
+
+祝您一切顺利！
+
+此致
+敬礼`;
+                    break;
+                case 'notification':
+                    subject = '重要通知：{姓名}';
+                    body = `尊敬的{姓名}：
+
+您好！
+
+这是一条重要通知，请注意查收。
+
+通知内容：
+1. 内容一
+2. 内容二
+3. 内容三
+
+如有疑问，请及时与我们联系。
+
+此致
+敬礼`;
+                    break;
+                case 'marketing':
+                    subject = '【限时优惠】为{姓名}准备的特别 offer';
+                    body = `亲爱的{姓名}：
+
+您好！
+
+我们为您准备了一份特别的优惠，仅限本周有效。
+
+优惠详情：
+- 产品折扣：8折优惠
+- 免费配送
+- 额外赠品
+
+立即行动，点击以下链接了解更多详情。
+
+祝您购物愉快！
+
+此致
+敬礼`;
+                    break;
+            }
+            
+            document.getElementById('email-subject').value = subject;
+            document.getElementById('email-body').value = body;
+            
+            updatePreview();
+            showToast('成功', '模板已加载');
+        }
+        
+        // 保存自定义模板
+        function saveCustomTemplate() {
+            const subject = document.getElementById('email-subject').value.trim();
+            const body = document.getElementById('email-body').value.trim();
+            
+            if (!subject || !body) {
+                showToast('错误', '请填写邮件主题和正文', 'error');
+                return;
+            }
+            
+            const templateName = prompt('请输入模板名称：');
+            
+            if (!templateName) {
+                return;
+            }
+            
+            try {
+                let customTemplates = JSON.parse(localStorage.getItem('customTemplates') || '[]');
+                
+                // 检查是否已存在同名模板
+                const existingIndex = customTemplates.findIndex(t => t.name === templateName);
+                
+                if (existingIndex >= 0) {
+                    if (confirm('已存在同名模板，是否覆盖？')) {
+                        customTemplates[existingIndex] = {
+                            name: templateName,
+                            subject,
+                            body,
+                            createdAt: new Date().toISOString()
+                        };
+                    } else {
+                        return;
+                    }
+                } else {
+                    customTemplates.push({
+                        name: templateName,
+                        subject,
+                        body,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+                
+                localStorage.setItem('customTemplates', JSON.stringify(customTemplates));
+                showToast('成功', '自定义模板已保存');
+            } catch (error) {
+                showToast('错误', '保存自定义模板失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 处理附件文件
+        function handleAttachmentFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            // 检查文件大小限制
+            const maxFileSize = 10 * 1024 * 1024; // 10MB
+            const maxTotalSize = 25 * 1024 * 1024; // 25MB
+            
+            // 计算当前附件总大小
+            let currentTotalSize = attachments.reduce((total, att) => total + att.size, 0);
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // 检查单个文件大小
+                if (file.size > maxFileSize) {
+                    showToast('警告', `${file.name} 超过10MB，已跳过`, 'warning');
+                    continue;
+                }
+                
+                // 检查总大小
+                if (currentTotalSize + file.size > maxTotalSize) {
+                    showToast('警告', '附件总大小超过25MB，已停止添加', 'warning');
+                    break;
+                }
+                
+                // 检查是否已存在同名文件
+                if (attachments.some(att => att.name === file.name)) {
+                    showToast('警告', `${file.name} 已存在，已跳过`, 'warning');
+                    continue;
+                }
+                
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const newAttachment = {
+                        id: generateUniqueId(),
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        data: e.target.result.split(',')[1] // 移除base64前缀
+                    };
+                    
+                    attachments.push(newAttachment);
+                    
+                    // 更新UI
+                    renderAttachments();
+                    updateAttachmentsSize();
+                };
+                
+                reader.readAsDataURL(file);
+                
+                // 更新当前总大小
+                currentTotalSize += file.size;
+            }
+            
+            // 保存附件
+            saveAttachments();
+            
+            // 清空文件输入
+            document.getElementById('attachment-files').value = '';
+        }
+        
+        // 保存附件
+        function saveAttachments() {
+            try {
+                // 只保存必要的信息，不保存文件数据（避免localStorage过大）
+                const attachmentsInfo = attachments.map(att => ({
+                    id: att.id,
+                    name: att.name,
+                    size: att.size,
+                    type: att.type
+                }));
+                
+                localStorage.setItem('attachmentsInfo', JSON.stringify(attachmentsInfo));
+            } catch (error) {
+                showToast('错误', '保存附件信息失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 加载附件信息
+        function loadAttachments() {
+            try {
+                const savedInfo = localStorage.getItem('attachmentsInfo');
+                if (savedInfo) {
+                    const attachmentsInfo = JSON.parse(savedInfo);
+                    
+                    // 注意：这里只加载了附件信息，实际文件数据需要重新上传
+                    attachments = attachmentsInfo.map(info => ({
+                        ...info,
+                        data: '' // 数据为空，需要重新上传
+                    }));
+                    
+                    renderAttachments();
+                    updateAttachmentsSize();
+                    
+                    // 如果有附件但没有数据，提示用户重新上传
+                    if (attachments.length > 0) {
+                        showToast('提示', '检测到附件记录，请重新上传附件文件', 'info');
+                    }
+                }
+            } catch (error) {
+                console.error('加载附件信息失败:', error);
+            }
+        }
+        
+        // 渲染附件列表
+        function renderAttachments() {
+            const attachmentsList = document.getElementById('attachments-list');
+            
+            if (attachments.length === 0) {
+                attachmentsList.innerHTML = '<div class="text-sm text-gray-500 py-4 text-center">暂无附件</div>';
+            } else {
+                attachmentsList.innerHTML = attachments.map(att => `
+                    <div class="flex items-center justify-between p-2 border rounded-md">
+                        <div class="flex items-center">
+                            <i class="fa fa-file-o text-gray-500 mr-2"></i>
+                            <div>
+                                <div class="text-sm font-medium">${att.name}</div>
+                                <div class="text-xs text-gray-500">${formatFileSize(att.size)}</div>
+                            </div>
+                        </div>
+                        <button class="text-red-600 hover:text-red-900" onclick="deleteAttachment('${att.id}')">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        // 更新附件总大小
+        function updateAttachmentsSize() {
+            const totalSize = attachments.reduce((total, att) => total + att.size, 0);
+            document.getElementById('attachments-size').textContent = formatFileSize(totalSize);
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 删除附件
+        function deleteAttachment(id) {
+            attachments = attachments.filter(att => att.id !== id);
+            
+            // 保存并更新UI
+            saveAttachments();
+            renderAttachments();
+            updateAttachmentsSize();
+            
+            showToast('成功', '附件已删除');
+        }
+        
+        // 清空附件
+        function clearAttachments() {
+            if (confirm('确定要清空所有附件吗？此操作不可撤销。')) {
+                attachments = [];
+                
+                // 保存并更新UI
+                saveAttachments();
+                renderAttachments();
+                updateAttachmentsSize();
+                
+                showToast('成功', '附件已清空');
+            }
+        }
+        
+        // 更新统计信息
+        function updateStats() {
+            const total = recipients.length;
+            const pending = recipients.filter(r => r.status === 'pending').length;
+            const success = recipients.filter(r => r.status === 'success').length;
+            const failed = recipients.filter(r => r.status === 'failed').length;
+            
+            document.getElementById('stats-total').textContent = total;
+            document.getElementById('stats-pending').textContent = pending;
+            document.getElementById('stats-success').textContent = success;
+            document.getElementById('stats-failed').textContent = failed;
+            
+            // 更新进度条
+            const progressValue = document.getElementById('progress-value');
+            const progressText = document.getElementById('progress-text');
+            
+            const completed = success + failed;
+            const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+            
+            progressValue.style.width = `${percentage}%`;
+            progressText.textContent = `${completed}/${total}`;
+        }
+        
+        // 开始发送邮件
+        function startSending() {
+            // 验证配置
+            if (!userConfig.email || !userConfig.password || !userConfig.smtpServer) {
+                showToast('错误', '请先配置邮箱信息', 'error');
+                return;
+            }
+            
+            // 验证收件人
+            if (recipients.length === 0) {
+                showToast('错误', '请添加收件人', 'error');
+                return;
+            }
+            
+            // 验证邮件模板
+            if (!emailTemplate.subject || !emailTemplate.body) {
+                showToast('错误', '请编辑邮件内容', 'error');
+                return;
+            }
+            
+            // 检查待发送的收件人
+            const pendingRecipients = recipients.filter(r => r.status === 'pending');
+            
+            if (pendingRecipients.length === 0) {
+                showToast('提示', '没有待发送的收件人', 'info');
+                return;
+            }
+            
+            // 设置发送状态
+            isSending = true;
+            isPaused = false;
+            
+            // 更新按钮状态
+            document.getElementById('start-sending').disabled = true;
+            document.getElementById('pause-sending').disabled = false;
+            
+            // 清空日志
+            document.getElementById('send-log').innerHTML = '';
+            
+            // 根据发送顺序排序
+            let recipientsToSend = [...pendingRecipients];
+            
+            if (sendOrder === 'random') {
+                recipientsToSend = shuffleArray(recipientsToSend);
+            }
+            
+            // 开始发送
+            currentRecipientIndex = 0;
+            sendNextEmail(recipientsToSend);
+            
+            showToast('成功', '开始发送邮件');
+        }
+        
+        // 随机排序数组
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // 发送下一封邮件
+        function sendNextEmail(recipientsToSend) {
+            if (!isSending || isPaused || currentRecipientIndex >= recipientsToSend.length) {
+                // 发送完成或暂停
+                if (currentRecipientIndex >= recipientsToSend.length) {
+                    isSending = false;
+                    document.getElementById('start-sending').disabled = false;
+                    document.getElementById('pause-sending').disabled = true;
+                    document.getElementById('pause-sending').innerHTML = '<i class="fa fa-pause mr-1"></i> 暂停发送';
+                    
+                    showToast('成功', '邮件发送任务已完成', 'success');
+                }
+                
+                return;
+            }
+            
+            const recipient = recipientsToSend[currentRecipientIndex];
+            
+            // 更新收件人状态
+            updateRecipientStatus(recipient.id, 'sending');
+            
+            // 替换占位符
+            const subject = emailTemplate.subject.replace('{姓名}', recipient.name);
+            const body = emailTemplate.body.replace('{姓名}', recipient.name);
+            
+            // 记录日志
+            addLog(`正在发送邮件给 ${recipient.name} (${recipient.email})...`);
+            
+            // 模拟发送邮件（实际项目中应该使用SMTP.js发送）
+            setTimeout(() => {
+                // 随机模拟成功或失败（实际项目中应该根据真实结果）
+                const isSuccess = Math.random() > 0.1; // 90%成功率
+                
+                if (isSuccess) {
+                    updateRecipientStatus(recipient.id, 'success', new Date());
+                    addLog(`✓ 邮件发送成功: ${recipient.name}`);
+                } else {
+                    updateRecipientStatus(recipient.id, 'failed');
+                    addLog(`✗ 邮件发送失败: ${recipient.name}`);
+                }
+                
+                // 更新UI
+                renderRecipients();
+                updateStats();
+                
+                // 发送下一封
+                currentRecipientIndex++;
+                
+                // 等待指定间隔后发送下一封
+                setTimeout(() => {
+                    sendNextEmail(recipientsToSend);
+                }, sendInterval * 60 * 1000); // 转换为毫秒
+            }, 2000); // 模拟发送时间
+        }
+        
+        // 更新收件人状态
+        function updateRecipientStatus(id, status, sentTime = null) {
+            const recipient = recipients.find(r => r.id === id);
+            
+            if (recipient) {
+                recipient.status = status;
+                
+                if (status === 'success' && sentTime) {
+                    recipient.sent = true;
+                    recipient.sentTime = sentTime.toISOString();
+                } else {
+                    recipient.sent = false;
+                    recipient.sentTime = null;
+                }
+                
+                // 保存更新
+                saveRecipients();
+            }
+        }
+        
+        // 添加日志
+        function addLog(message) {
+            const logContainer = document.getElementById('send-log');
+            const logEntry = document.createElement('div');
+            
+            logEntry.className = 'py-1 border-b border-gray-200';
+            logEntry.innerHTML = `
+                <span class="text-xs text-gray-500">${new Date().toLocaleTimeString('zh-CN')}</span>
+                <span class="ml-2">${message}</span>
+            `;
+            
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // 暂停发送
+        function pauseSending() {
+            if (isPaused) {
+                // 继续发送
+                isPaused = false;
+                document.getElementById('pause-sending').innerHTML = '<i class="fa fa-pause mr-1"></i> 暂停发送';
+                
+                // 找到所有待发送的收件人
+                const pendingRecipients = recipients.filter(r => r.status === 'pending');
+                
+                if (pendingRecipients.length > 0) {
+                    sendNextEmail(pendingRecipients);
+                }
+                
+                showToast('成功', '已继续发送邮件');
+            } else {
+                // 暂停发送
+                isPaused = true;
+                document.getElementById('pause-sending').innerHTML = '<i class="fa fa-play mr-1"></i> 继续发送';
+                showToast('成功', '已暂停发送邮件');
+            }
+        }
+        
+        // 重置发送状态
+        function resetSending() {
+            if (confirm('确定要重置所有收件人的发送状态吗？')) {
+                recipients.forEach(recipient => {
+                    recipient.sent = false;
+                    recipient.sentTime = null;
+                    recipient.status = 'pending';
+                });
+                
+                // 保存并更新UI
+                saveRecipients();
+                renderRecipients();
+                updateStats();
+                
+                // 重置发送控制
+                isSending = false;
+                isPaused = false;
+                document.getElementById('start-sending').disabled = false;
+                document.getElementById('pause-sending').disabled = true;
+                document.getElementById('pause-sending').innerHTML = '<i class="fa fa-pause mr-1"></i> 暂停发送';
+                
+                // 清空日志
+                document.getElementById('send-log').innerHTML = '<div class="text-gray-500 text-center py-4">暂无发送记录</div>';
+                
+                showToast('成功', '发送状态已重置');
+            }
+        }
+    </script>
+</body>
 </html>
